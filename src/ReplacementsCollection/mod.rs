@@ -1,39 +1,64 @@
-use std::{collections::HashMap, cell::RefCell};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 pub enum Gender {
     Male,
     Female,
 }
 
-pub struct GenderReplacement<'a> {
-    male: &'a str,
-    female: &'a str,
+pub struct GenderReplacement {
+    male: String,
+    female: String,
 }
 
-pub trait GenderReplacementCollection<'a> {
-    fn get_replacement(&self, text_to_replace: &str, gender: Gender) -> Option<&str>;
-    fn add_replacent(&mut self, target_text: &'a str, replacement: GenderReplacement<'a>);
+impl GenderReplacement {
+    pub fn new(male: &str, female: &str) -> Self {
+        Self {
+            male: male.to_lowercase(),
+            female: female.to_lowercase(),
+        }
+    }
+
+    pub fn get_replacement(&self, gender: &Gender) -> &str {
+        match gender {
+            Gender::Male => &self.male,
+            Gender::Female => &self.female,
+        }
+    }
 }
 
-pub struct DefaltGenderReplacementCollection<'a> {
-    replacements: RefCell<HashMap<&'a str, GenderReplacement<'a>>>,
+pub trait GenderReplacementCollection {
+    fn get_replacement(&self, text_to_replace: &str) -> Option<Rc<GenderReplacement>>;
+    fn add_replacent(&mut self, target_text: &str, replacement: GenderReplacement);
 }
 
-impl<'a> GenderReplacementCollection<'a> for DefaltGenderReplacementCollection<'a> {
-    fn get_replacement(&self, text_to_replace: &str, gender: Gender) -> Option<&str> {
+pub struct DefaltGenderReplacementCollection {
+    replacements: RefCell<HashMap<String, Rc<GenderReplacement>>>,
+}
+
+impl DefaltGenderReplacementCollection {
+    pub fn new() -> Self {
+        Self {
+            replacements: RefCell::new(HashMap::new()),
+        }
+    }
+}
+
+impl GenderReplacementCollection for DefaltGenderReplacementCollection {
+    fn get_replacement(&self, text_to_replace: &str) -> Option<Rc<GenderReplacement>> {
         let map = self.replacements.borrow();
         let replacement = map.get(text_to_replace);
         if let Some(x) = replacement {
-            match gender {
-                Gender::Male => Some(x.male),
-                Gender::Female => Some(x.female),
-            }
+            Some(Rc::clone(x))
         } else {
             None
         }
     }
 
-    fn add_replacent(&mut self, target_text: &'a str, replacement: GenderReplacement<'a>) {
-        self.replacements.borrow_mut().insert(target_text, replacement);
+    fn add_replacent(&mut self, target_text: &str, replacement: GenderReplacement) {
+        let key = target_text.to_owned().to_lowercase();
+
+        self.replacements
+            .borrow_mut()
+            .insert(key, Rc::new(replacement));
     }
 }

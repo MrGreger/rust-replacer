@@ -1,6 +1,12 @@
-use regex::{Captures, Regex};
+use std::sync::Arc;
 
-use crate::TextReplacing::RegexReplacerKeepCase;
+use regex::{Captures, Regex};
+use ReplacementsCollection::{
+    DefaltGenderReplacementCollection, GenderReplacement, GenderReplacementCollection, Gender,
+};
+use TextAttributes::{TextPart, TextAccessor};
+use TextReplacing::{DefaultTextReplacer, TextReplacer};
+use TextSplitting::{DefaultTextSpitter, TextSplitter};
 
 mod ReplacementsCollection;
 mod TextAttributes;
@@ -8,19 +14,28 @@ mod TextReplacing;
 mod TextSplitting;
 
 fn main() {
-    // let mut replacer = RegexReplacerKeepCase::new();
+    let sentence = "лол 123 \" \" dsfsd лол лол Лол лОл лоЛ \"";
 
-    // let a = replacer.replace("LOL LOL", "LOL", "KEK");
+    let mut replacements_collection = DefaltGenderReplacementCollection::new();
+    replacements_collection.add_replacent("лол", GenderReplacement::new("лолий", "лолушка"));
 
-    let re = Regex::new(r"LOL").unwrap();
-    let result = re.replace_all("LOL KEK 123 123 LOL", |caps: &Captures| {
-        for a in caps.iter(){
-            if let Some(x) = a {
-                //println!("{}",x.as_str().to_string());
-            }
-        }
+    let mut replacements_collection: Arc<Box<dyn GenderReplacementCollection>> =
+        Arc::new(Box::new(replacements_collection));
 
-        ""
-    });
-    println!("{}", result);
+    let text_splitter = DefaultTextSpitter;
+    let text_replacer = DefaultTextReplacer::new(Arc::clone(&replacements_collection));
+
+    let mut text_parts = text_splitter.split(&vec![TextPart::PlainText(sentence.to_string())]);
+
+    for part in &text_parts {
+        print!("{}", part.get_text());
+    }
+
+    println!("");
+
+    text_replacer.replace(&mut text_parts, &Gender::Male);
+    
+    for part in text_parts {
+        print!("{}", part.get_text());
+    }
 }

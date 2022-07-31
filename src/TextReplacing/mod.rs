@@ -1,45 +1,120 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
-use regex::Regex;
+use regex::{Captures, Regex};
 
 use crate::{
-    ReplacementsCollection::GenderReplacementCollection,
+    ReplacementsCollection::{Gender, GenderReplacementCollection},
     TextAttributes::{TextAccessor, TextPart},
 };
 
 pub trait TextReplacer {
-    fn replace(&self, parts: &mut Vec<TextPart>);
+    fn replace(&self, parts: &mut Vec<TextPart>, gender: &Gender);
 }
 
-pub struct DefaultTextReplacer<'a> {
-    replacement_collection: Arc<Box<dyn GenderReplacementCollection<'a>>>,
+pub struct DefaultTextReplacer {
+    replacement_collection: Arc<Box<dyn GenderReplacementCollection>>,
+    replacers_cache: RegexReplacerCache,
 }
 
-pub struct RegexReplacerKeepCase<'a> {
-    cached_regex: HashMap<&'a str, Regex>,
-}
-
-impl<'a> RegexReplacerKeepCase<'a> {
-    pub fn new() -> Self{
-        RegexReplacerKeepCase { cached_regex: HashMap::new() }
-    }
-
-    pub fn replace(&mut self, string_to_replace: &str, replacement_word: &str , replacement: &str) -> String{
-        Regex::new(replacement_word).unwrap().replace_all(string_to_replace, replacement).to_string()
-    }
-}
-
-impl<'a> regex::Replacer for RegexReplacerKeepCase<'a>{
-    fn replace_append(&mut self, caps: &regex::Captures<'_>, dst: &mut String) {
-        let word_match = caps.get(0).unwrap().as_str();
-        for c in word_match.chars() {
-            
+impl DefaultTextReplacer {
+    pub fn new(replacement_collection: Arc<Box<dyn GenderReplacementCollection>>) -> Self {
+        Self {
+            replacement_collection,
+            replacers_cache: RegexReplacerCache::new(),
         }
     }
 }
 
-impl TextReplacer for DefaultTextReplacer<'_> {
-    fn replace(&self, parts: &mut Vec<TextPart>) {
-        for part in parts {}
+struct RegexReplacerCache {
+    cached_regex: RefCell<HashMap<String, Rc<RegexReplacerKeepCase>>>,
+}
+
+struct RegexReplacerKeepCase {
+    regex_template: Regex,
+}
+
+impl RegexReplacerKeepCase {
+    fn replace(&self, source: &str, replacement: &str) -> String {
+        self.regex_template
+            .replace_all(source, |caps: &Captures| {
+                let mut result = String::with_capacity(replacement.len());
+
+                for word_match_option in caps.iter() {
+                    if let Some(word_match) = word_match_option {
+                        let mut replacement_position = 0;
+                        let mut match_chars_iter = word_match.as_str().chars();
+
+                        for replacement_char in replacement.chars() {
+                            if let Some(c) = match_chars_iter.nth(replacement_position) {
+                                if char::is_uppercase(c) {
+                                    for uppercased_char in char::to_uppercase(replacement_char) {
+                                        result.push(uppercased_char);
+                                    }
+                                } else {
+                                    result.push(replacement_char);
+                                }
+
+                                replacement_position += 1;
+                            } else {
+                                result.push(replacement_char);
+                            }
+                        }
+                    }
+                }
+
+                result
+            })
+            .to_string()
+    }
+}
+
+impl RegexReplacerCache {
+    fn new() -> Self {
+        RegexReplacerCache {
+            cached_regex: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn get_replacer(&self, replace_template: &str) -> Rc<RegexReplacerKeepCase> {
+        if let Some(x) = self.cached_regex.borrow_mut().get(replace_template) {
+            return Rc::clone(x);
+        }
+
+        let key = replace_template.to_owned();
+
+        let replacer = Rc::new(RegexReplacerKeepCase {
+            regex_template: Regex::new(replace_template)
+                .expect("Failed to create regex replacement"),
+        });
+
+        let result = Rc::clone(&replacer);
+
+        self.cached_regex.borrow_mut().insert(key, replacer);
+
+        result
+    }
+}
+
+impl TextReplacer for DefaultTextReplacer {
+    fn replace(&self, parts: &mut Vec<TextPart>, gender: &Gender) {
+        for part in parts {
+            let text = part.get_text().to_owned();
+
+            for word in text.split(' ') {
+                if let Some(replacement_variants) =
+                    self.replacement_collection.get_replacement(word)
+                {
+                    let replacer = self
+                        .replacers_cache
+                        .get_replacer(&format!(r"(?i){}", word));
+
+                    part.set_text(RegexReplacerKeepCase::replace(
+                        replacer.as_ref(),
+                        &text,
+                        replacement_variants.get_replacement(gender),
+                    ));
+                }
+            }
+        }
     }
 }

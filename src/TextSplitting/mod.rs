@@ -12,16 +12,16 @@ impl TextSplitter for DefaultTextSpitter {
 
         for part in parts {
             let mut part_cursor = 0;
-            let part_len = part.get_text().chars().count();
+            let part_chars: Vec<char> = part.get_text().chars().collect();
 
-            while part_cursor != part_len {
-                let result_part = self.process_simple_text(&part, &mut part_cursor, &part_len);
+            while part_cursor != part_chars.len() {
+                let result_part = self.process_simple_text(&part_chars, &mut part_cursor);
 
                 if let Some(x) = result_part {
                     result.push(x);
                 }
 
-                let result_part = self.process_quoted_text(&part, &mut part_cursor, &part_len);
+                let result_part = self.process_quoted_text(&part_chars, &mut part_cursor);
 
                 if let Some(x) = result_part {
                     result.push(x);
@@ -36,25 +36,22 @@ impl TextSplitter for DefaultTextSpitter {
 impl DefaultTextSpitter {
     fn process_simple_text(
         &self,
-        source_part: &TextPart,
+        source_part: &Vec<char>,
         part_cursor: &mut usize,
-        part_len: &usize,
     ) -> Option<TextPart> {
-        let mut source_text_iter = source_part.get_text().chars();
-        let mut result = String::with_capacity(*part_len);
+        let mut result = String::with_capacity(source_part.len());
 
         loop {
-            if *part_cursor >= *part_len {
+            if *part_cursor >= source_part.len() {
+                break;
+            }
+            let char = source_part.get(*part_cursor).unwrap();
+            
+            if *char == '"' {
                 break;
             }
 
-            let char = source_text_iter.nth(*part_cursor).unwrap();
-
-            if char == '"' {
-                break;
-            }
-
-            result.push(char);
+            result.push(*char);
 
             *part_cursor += 1;
         }
@@ -68,17 +65,15 @@ impl DefaultTextSpitter {
 
     fn process_quoted_text(
         &self,
-        source_part: &TextPart,
+        source_part: &Vec<char>,
         part_cursor: &mut usize,
-        part_len: &usize,
     ) -> Option<TextPart> {
-        let mut source_text_iter = source_part.get_text().chars();
-        let mut result = String::with_capacity(*part_len);
+        let mut result = String::with_capacity(source_part.len());
 
         let mut quotes_counter = 0;
 
         loop {
-            if *part_cursor >= *part_len {
+            if *part_cursor >= source_part.len() {
                 break;
             }
 
@@ -86,13 +81,13 @@ impl DefaultTextSpitter {
                 break;
             }
 
-            let char = source_text_iter.nth(*part_cursor).unwrap();
+            let char = source_part.get(*part_cursor).unwrap();
 
-            if char == '"' {
+            if *char == '"' {
                 quotes_counter += 1;
             }
 
-            result.push(char);
+            result.push(*char);
 
             *part_cursor += 1;
         }

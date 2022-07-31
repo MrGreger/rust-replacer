@@ -98,21 +98,21 @@ impl RegexReplacerCache {
 impl TextReplacer for DefaultTextReplacer {
     fn replace(&self, parts: &mut Vec<TextPart>, gender: &Gender) {
         for part in parts {
-            let text = part.get_text().to_owned();
+            if let TextPart::PlainText(_) = part {
+                let text = part.get_text().to_owned();
 
-            for word in text.split(' ') {
-                if let Some(replacement_variants) =
-                    self.replacement_collection.get_replacement(word)
-                {
-                    let replacer = self
-                        .replacers_cache
-                        .get_replacer(&format!(r"(?i){}", word));
+                for word in text.split(' ') {
+                    if let Some(replacement_variants) =
+                        self.replacement_collection.get_replacement(word)
+                    {
+                        let replacer = self.replacers_cache.get_replacer(&format!(r"(?i){}", word));
 
-                    part.set_text(RegexReplacerKeepCase::replace(
-                        replacer.as_ref(),
-                        &text,
-                        replacement_variants.get_replacement(gender),
-                    ));
+                        part.set_text(RegexReplacerKeepCase::replace(
+                            replacer.as_ref(),
+                            &text,
+                            replacement_variants.get_replacement(gender),
+                        ));
+                    }
                 }
             }
         }

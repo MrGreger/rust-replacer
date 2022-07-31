@@ -14,7 +14,7 @@ mod TextReplacing;
 mod TextSplitting;
 
 fn main() {
-    let sentence = "лол 123 \" \" dsfsd лол лол Лол лОл лоЛ \"";
+    let sentence = "лол 123 \" лол \" dsfsd лол лол Лол лОл лоЛ \" лол";
 
     let mut replacements_collection = DefaltGenderReplacementCollection::new();
     replacements_collection.add_replacent("лол", GenderReplacement::new("лолий", "лолушка"));

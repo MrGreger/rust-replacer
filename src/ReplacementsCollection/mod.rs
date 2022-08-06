@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 pub enum Gender {
     Male,
@@ -27,28 +27,26 @@ impl GenderReplacement {
 }
 
 pub trait GenderReplacementCollection {
-    fn get_replacement(&self, text_to_replace: &str) -> Option<Rc<GenderReplacement>>;
+    fn get_replacement(&self, text_to_replace: &str) -> Option<&GenderReplacement>;
     fn add_replacent(&mut self, target_text: &str, replacement: GenderReplacement);
 }
 
 pub struct DefaltGenderReplacementCollection {
-    replacements: RefCell<HashMap<String, Rc<GenderReplacement>>>,
+    replacements: HashMap<String, GenderReplacement>,
 }
 
 impl DefaltGenderReplacementCollection {
     pub fn new() -> Self {
         Self {
-            replacements: RefCell::new(HashMap::new()),
+            replacements: HashMap::new(),
         }
     }
 }
 
 impl GenderReplacementCollection for DefaltGenderReplacementCollection {
-    fn get_replacement(&self, text_to_replace: &str) -> Option<Rc<GenderReplacement>> {
-        let map = self.replacements.borrow();
-        let replacement = map.get(text_to_replace);
-        if let Some(x) = replacement {
-            Some(Rc::clone(x))
+    fn get_replacement(&self, text_to_replace: &str) -> Option<&GenderReplacement> {
+        if let Some(x) = self.replacements.get(text_to_replace) {
+            Some(x)
         } else {
             None
         }
@@ -57,8 +55,6 @@ impl GenderReplacementCollection for DefaltGenderReplacementCollection {
     fn add_replacent(&mut self, target_text: &str, replacement: GenderReplacement) {
         let key = target_text.to_owned().to_lowercase();
 
-        self.replacements
-            .borrow_mut()
-            .insert(key, Rc::new(replacement));
+        self.replacements.insert(key, replacement);
     }
 }
